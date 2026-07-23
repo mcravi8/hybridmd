@@ -6,19 +6,22 @@ scope. It needs the optional ``bench`` extra (tiktoken)::
 
     pip install "hybridmd[bench]"
 
-It renders two corpora — a 2-table report excerpt and a table-heavy appendix —
-three ways each: hybrid (the analyzer's own per-table decision), ``force="html"``
-and ``force="md"``. It counts tokens with tiktoken's ``cl100k_base`` encoding and
-reports, per corpus, the token deltas AND the fidelity cost: tables the analyzer
-flagged as needing HTML but that ``force="md"`` emitted as lossy Markdown. Two
-corpora make a point one fixture cannot — the hybrid-vs-``force="html"`` saving
-scales with how many *simple* tables a document holds. Token counts are
+It renders a fixture three ways — hybrid (the analyzer's own per-table decision),
+``force="html"`` and ``force="md"`` — counts tokens with tiktoken's
+``cl100k_base`` encoding, and reports per fixture the token deltas AND the
+fidelity cost: tables the analyzer flagged as needing HTML but that
+``force="md"`` emitted as lossy Markdown.
+
+Run with no arguments to compare both bundled fixtures side by side (which shows
+that the hybrid-vs-``force="html"`` saving scales with simple-table density);
+pass a fixture path to report on just that one. Token counts are
 tokenizer-specific; the header names the tokenizer so they are not mistaken for
 universal.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import sys
@@ -32,9 +35,9 @@ from hybridmd import DocElement, render  # noqa: E402
 
 _ENCODING_NAME = "cl100k_base"
 _EXAMPLES = _ROOT / "examples"
-_CORPORA = (
-    ("2-table report excerpt", _EXAMPLES / "demo_elements.json"),
-    ("table-heavy appendix", _EXAMPLES / "demo_elements_table_heavy.json"),
+_DEFAULT_FIXTURES = (
+    _EXAMPLES / "demo_elements.json",
+    _EXAMPLES / "table_heavy_elements.json",
 )
 _MODES = (
     ("hybrid", None, False),
@@ -84,8 +87,8 @@ def _corruption(annotated: str) -> tuple[int, int]:
     return corrupted, total
 
 
-def _report_corpus(label: str, path: Path, encoder) -> tuple[int, int]:
-    """Print one corpus's report; return (html_overhead_tokens, simple_tables)."""
+def _report_fixture(path: Path, encoder) -> tuple[int, int]:
+    """Print one fixture's comparison block; return (html_overhead, simple_tables)."""
     elements = _load(path)
     counts = {
         name: len(encoder.encode(render(elements, annotate=False, force=force)))
@@ -95,7 +98,7 @@ def _report_corpus(label: str, path: Path, encoder) -> tuple[int, int]:
     simple, complex_ = _table_mix(render(elements, annotate=True, force=None))
     corrupted, total = _corruption(render(elements, annotate=True, force="md"))
 
-    print(f"{label}  ({simple} simple, {complex_} complex tables)")
+    print(f"{path.name}  ({simple} simple + {complex_} complex tables)")
     header = f"  {'mode':<11} {'tokens':>6} {'delta':>7} {'delta%':>7}  lossy"
     print(header)
     print("  " + "-" * (len(header) - 2))
@@ -110,22 +113,36 @@ def _report_corpus(label: str, path: Path, encoder) -> tuple[int, int]:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Token-count comparison for hybridmd's demo fixtures."
+    )
+    parser.add_argument(
+        "fixture",
+        nargs="?",
+        default=None,
+        help="fixture JSON to report on; omit to compare both bundled fixtures",
+    )
+    args = parser.parse_args()
+    fixtures = [Path(args.fixture)] if args.fixture else list(_DEFAULT_FIXTURES)
+
     encoder = _get_encoder()
     print(f"hybridmd token report  —  tokenizer: tiktoken {_ENCODING_NAME}")
     print()
 
     overheads: list[tuple[str, int, int]] = []
-    for label, path in _CORPORA:
-        overhead, simple = _report_corpus(label, path, encoder)
-        overheads.append((label, overhead, simple))
+    for path in fixtures:
+        overhead, simple = _report_fixture(path, encoder)
+        overheads.append((path.name, overhead, simple))
 
-    print('hybrid vs force="html" — the HTML overhead hybrid avoids on simple tables:')
-    for label, overhead, simple in overheads:
-        per = overhead / simple if simple else 0.0
-        print(
-            f"  {label:<23} +{overhead} tokens over {simple} simple (~{per:.0f}/table)"
-        )
-    print("The saving scales with the number of simple tables in the document.")
+    if len(overheads) > 1:
+        print('hybrid vs force="html" — HTML overhead avoided on simple tables:')
+        for name, overhead, simple in overheads:
+            per = overhead / simple if simple else 0.0
+            print(
+                f"  {name:<26} +{overhead} tokens over "
+                f"{simple} simple (~{per:.0f}/table)"
+            )
+        print("The saving scales with the number of simple tables in the document.")
 
 
 if __name__ == "__main__":

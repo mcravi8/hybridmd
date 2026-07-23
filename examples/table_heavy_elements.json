@@ -1,0 +1,97 @@
+[
+  {
+    "type": "heading",
+    "text": "Meridian Global Opportunities Fund — Annual Data Supplement",
+    "level": 1
+  },
+  {
+    "type": "paragraph",
+    "text": "The following supplementary tables accompany the FY2025 annual report. All figures are as of December 31, 2025 and are preliminary and unaudited unless otherwise noted."
+  },
+  {
+    "type": "heading",
+    "text": "Trailing Returns",
+    "level": 2
+  },
+  {
+    "type": "paragraph",
+    "text": "Returns are net of fees; periods longer than one year are annualized."
+  },
+  {
+    "type": "table",
+    "text": "Trailing returns versus benchmark",
+    "html": "<table><thead><tr><th>Period</th><th>Fund</th><th>Benchmark</th></tr></thead><tbody><tr><td>1 Year</td><td>19.7%</td><td>16.9%</td></tr><tr><td>3 Year</td><td>11.2%</td><td>10.1%</td></tr></tbody></table>"
+  },
+  {
+    "type": "heading",
+    "text": "Sector Positioning",
+    "level": 2
+  },
+  {
+    "type": "paragraph",
+    "text": "Active weights reflect positioning relative to the blended benchmark."
+  },
+  {
+    "type": "table",
+    "text": "Sector weights and active positioning",
+    "html": "<table><thead><tr><th>Sector</th><th>Weight</th><th>Benchmark</th><th>Active</th><th>YoY</th></tr></thead><tbody><tr><td>Industrials</td><td>22.5%</td><td>15.1%</td><td>+7.4%</td><td>+3.1%</td></tr><tr><td>Technology</td><td>18.9%</td><td>24.3%</td><td>-5.4%</td><td>-2.0%</td></tr><tr><td>Financials</td><td>16.2%</td><td>13.8%</td><td>+2.4%</td><td>+0.6%</td></tr></tbody></table>"
+  },
+  {
+    "type": "heading",
+    "text": "Top Holdings",
+    "level": 2
+  },
+  {
+    "type": "table",
+    "text": "Ten largest holdings by weight",
+    "html": "<table><thead><tr><th>Holding</th><th>Ticker</th><th>Weight</th><th>Sector</th></tr></thead><tbody><tr><td>Ashford Industrial Group</td><td>AIG</td><td>4.8%</td><td>Industrials</td></tr><tr><td>Vantage Semiconductor</td><td>VSM</td><td>4.1%</td><td>Technology</td></tr><tr><td>Northbridge Capital</td><td>NBC</td><td>3.6%</td><td>Financials</td></tr><tr><td>Calder Energy Partners</td><td>CEP</td><td>3.2%</td><td>Energy</td></tr></tbody></table>"
+  },
+  {
+    "type": "heading",
+    "text": "Geographic Exposure",
+    "level": 2
+  },
+  {
+    "type": "paragraph",
+    "text": "Exposure is measured by revenue domicile of the underlying holdings."
+  },
+  {
+    "type": "table",
+    "text": "Exposure by region",
+    "html": "<table><thead><tr><th>Region</th><th>Weight</th><th>Change</th></tr></thead><tbody><tr><td>North America</td><td>58.0%</td><td>+1.2%</td></tr><tr><td>Europe</td><td>21.5%</td><td>-0.8%</td></tr><tr><td>Asia-Pacific</td><td>12.5%</td><td>-0.4%</td></tr><tr><td>Latin America</td><td>5.0%</td><td>+0.1%</td></tr><tr><td>Middle East and Africa</td><td>3.0%</td><td>-0.1%</td></tr></tbody></table>"
+  },
+  {
+    "type": "heading",
+    "text": "Fee Schedule",
+    "level": 2
+  },
+  {
+    "type": "table",
+    "text": "Fees and minimums by share class",
+    "html": "<table><thead><tr><th>Share Class</th><th>Mgmt Fee</th><th>Admin Fee</th><th>12b-1</th><th>Expense Ratio</th><th>Minimum</th></tr></thead><tbody><tr><td>Institutional</td><td>0.65%</td><td>0.05%</td><td>0.00%</td><td>0.72%</td><td>$1,000,000</td></tr><tr><td>Retail</td><td>0.95%</td><td>0.08%</td><td>0.25%</td><td>1.08%</td><td>$2,500</td></tr></tbody></table>"
+  },
+  {
+    "type": "heading",
+    "text": "Credit Quality",
+    "level": 2
+  },
+  {
+    "type": "table",
+    "text": "Credit quality of fixed income sleeve",
+    "html": "<table><thead><tr><th>Rating</th><th>Weight</th><th>Benchmark</th></tr></thead><tbody><tr><td>AAA</td><td>12.0%</td><td>9.5%</td></tr><tr><td>AA</td><td>28.5%</td><td>26.0%</td></tr><tr><td>A</td><td>34.0%</td><td>38.2%</td></tr></tbody></table>"
+  },
+  {
+    "type": "heading",
+    "text": "Segment Revenue",
+    "level": 2
+  },
+  {
+    "type": "paragraph",
+    "text": "Segment revenue is presented by fiscal year and quarter, with intersegment eliminations shown separately."
+  },
+  {
+    "type": "table",
+    "text": "Segment revenue by fiscal year and quarter",
+    "html": "<table><thead><tr><th rowspan=\"2\">Segment</th><th colspan=\"2\">FY2025 ($M)</th><th colspan=\"2\">FY2024 ($M)</th></tr><tr><th>Q3</th><th>Q4</th><th>Q3</th><th>Q4</th></tr></thead><tbody><tr><td>North America</td><td>412</td><td>438</td><td>388</td><td>401</td></tr><tr><td>Europe</td><td>256</td><td>271</td><td>241</td><td>249</td></tr><tr><td>Asia-Pacific</td><td>180</td><td>197</td><td>165</td><td>172</td></tr><tr><td rowspan=\"2\">Total revenue</td><td>848</td><td>906</td><td>794</td><td>822</td></tr><tr><td colspan=\"4\">Net of $12M intersegment eliminations</td></tr></tbody></table>"
+  }
+]
