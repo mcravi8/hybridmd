@@ -7,6 +7,8 @@ rows) plain Markdown cannot represent.
 
 from __future__ import annotations
 
+from hybridmd.schema import DocElement, ElementType
+
 __version__ = "0.0.1"
 
-__all__ = ["__version__"]
+__all__ = ["DocElement", "ElementType", "__version__"]
