@@ -28,6 +28,9 @@ dependencies = ["beautifulsoup4"]
 # optional extras and will be declared here as the library grows, e.g.:
 #   docx     = ["python-docx"]
 #   sanitize = ["nh3"]
+# The unstructured adapter reads its input purely by duck typing, so this extra is
+# needed only to PRODUCE elements — never to import/run the adapter or core CI.
+unstructured = ["unstructured"]
 dev = ["pytest", "ruff", "mypy"]
 
 [project.urls]
