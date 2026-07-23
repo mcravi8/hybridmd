@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "hybridmd"
+version = "0.0.1"
+description = "Convert parsed document elements into hybrid Markdown: Markdown where it's lossless, sanitized embedded HTML only for tables Markdown cannot represent."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Matteo Craviotto", email = "craviott@usc.edu" }]
+keywords = ["markdown", "html", "document-conversion", "tables", "sanitization"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Typing :: Typed",
+]
+dependencies = ["beautifulsoup4"]
+
+[project.optional-dependencies]
+# Adapters (document parsers) and backends (renderers / HTML sanitizers) ship as
+# optional extras and will be declared here as the library grows, e.g.:
+#   docx     = ["python-docx"]
+#   sanitize = ["nh3"]
+dev = ["pytest", "ruff", "mypy"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/hybridmd"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+testpaths = ["tests"]
+pythonpath = ["src"]
