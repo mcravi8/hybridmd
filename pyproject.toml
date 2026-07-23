@@ -31,6 +31,9 @@ dependencies = ["beautifulsoup4"]
 # The unstructured adapter reads its input purely by duck typing, so this extra is
 # needed only to PRODUCE elements — never to import/run the adapter or core CI.
 unstructured = ["unstructured"]
+# Dev tooling for scripts/token_report.py only — deliberately NOT in `dev`, so
+# core CI stays lean and never installs it.
+bench = ["tiktoken"]
 dev = ["pytest", "ruff", "mypy"]
 
 [project.urls]
