@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
-authors = [{ name = "Matteo Craviotto", email = "craviott@usc.edu" }]
+authors = [{ name = "Matteo Craviotto", email = "matteo.craviotto@gmail.com" }]
 keywords = ["markdown", "html", "document-conversion", "tables", "sanitization"]
 classifiers = [
   "Development Status :: 3 - Alpha",
@@ -29,6 +29,11 @@ dependencies = ["beautifulsoup4"]
 #   docx     = ["python-docx"]
 #   sanitize = ["nh3"]
 dev = ["pytest", "ruff", "mypy"]
+
+[project.urls]
+Homepage = "https://github.com/mcravi8/hybridmd"
+Repository = "https://github.com/mcravi8/hybridmd"
+Issues = "https://github.com/mcravi8/hybridmd/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/hybridmd"]
