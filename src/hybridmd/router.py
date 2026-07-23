@@ -49,15 +49,22 @@ def _render_table(el: DocElement, force: Force | None) -> _TableBlock:
         # No usable HTML → plain text. `force` does not affect this fallback.
         return _TableBlock(el.text, "text", "no_html", forced=False)
     try:
-        if force == "md":
-            return _TableBlock(table_to_markdown(html), "md", "none", forced=True)
-        if force == "html":
-            return _TableBlock(sanitize_table_html(html), "html", "none", forced=True)
+        # The analyzer runs even under `force`: `force` decides what is *emitted*,
+        # but the marker always reports the analyzer's real reasons — so the lossy
+        # force="md" arm is self-documenting (it records which tables it mangled).
         analysis = analyze_table(html)
+        reasons = (
+            ",".join(reason.value for reason in analysis.reasons)
+            if analysis.reasons
+            else "none"
+        )
+        if force == "md":
+            return _TableBlock(table_to_markdown(html), "md", reasons, forced=True)
+        if force == "html":
+            return _TableBlock(sanitize_table_html(html), "html", reasons, forced=True)
         if analysis.needs_html:
-            reasons = ",".join(reason.value for reason in analysis.reasons)
             return _TableBlock(sanitize_table_html(html), "html", reasons, forced=False)
-        return _TableBlock(table_to_markdown(html), "md", "none", forced=False)
+        return _TableBlock(table_to_markdown(html), "md", reasons, forced=False)
     except ValueError:
         # HTML present but no usable <table> (or a table with no rows). This must
         # never escape render; `force` does not rescue it — fall back to text.
@@ -94,12 +101,16 @@ def render(
             its own line immediately before each table (the marker and its table
             form one block). The marker reports ``format`` (``md``/``html``/
             ``text``) and ``reasons`` — the analyzer :class:`~hybridmd.analyzer.
-            Reason` values in declaration order for HTML, ``none`` for Markdown,
-            ``no_html`` for a fallback. When ``force`` is set, ``format`` reflects
-            what was actually emitted and ``forced=true`` is added so benchmark
-            output is distinguishable from analyzer decisions.
+            Reason` values in declaration order, ``none`` when the analyzer found
+            none, or ``no_html`` for a text fallback. When ``force`` is set,
+            ``format`` reflects what was actually emitted and ``forced=true`` is
+            added; the analyzer still runs, so ``reasons`` keeps reporting the real
+            verdict — which is what makes the lossy ``force="md"`` arm
+            self-documenting (the marker records exactly which tables it mangled).
         force: Override the analyzer for every table with usable HTML: ``"md"``
-            forces a Markdown pipe table, ``"html"`` forces sanitized HTML.
+            forces a Markdown pipe table, ``"html"`` forces sanitized HTML. The
+            analyzer still runs and its reasons are still reported (see
+            ``annotate``); ``force`` only changes what is emitted.
             **``force="md"`` is explicitly lossy** — it can mangle tables the
             analyzer would have kept as HTML, and exists for benchmarking, not
             production. ``force`` does not affect the text fallback paths.
