@@ -34,6 +34,15 @@ NO_HTML_TABLE = DocElement(ElementType.TABLE, "plain fallback", html=None)
 NO_TABLE_TAG = DocElement(
     ElementType.TABLE, "just a div", html="<div>no table here</div>"
 )
+EMPTY_TABLE = DocElement(ElementType.TABLE, "fallback text", html="<table></table>")
+MULTI_REASON_TABLE = DocElement(
+    ElementType.TABLE,
+    "Region\nUS 10",
+    html=(
+        '<table><tr><td colspan="2"><p>Region</p></td></tr>'
+        "<tr><td>US</td><td>10</td></tr></table>"
+    ),
+)
 
 MIXED = [HEADING, PARAGRAPH, LIST_ITEM, SIMPLE_TABLE, MERGED_TABLE]
 
@@ -125,6 +134,27 @@ def test_table_with_html_but_no_table_tag_falls_back_to_text() -> None:
     assert render([NO_TABLE_TAG], annotate=True) == (
         "<!-- hybridmd: table format=text reasons=no_html -->\njust a div\n"
     )
+
+
+def test_marker_lists_multiple_reasons_in_declaration_order() -> None:
+    # A cell that is both merged (colspan) and block content (<p>) yields two
+    # analyzer reasons; the marker joins them in Reason DECLARATION order
+    # (merged_cells before block_content), never sorted or discovery order.
+    assert render([MULTI_REASON_TABLE], annotate=True) == (
+        "<!-- hybridmd: table format=html reasons=merged_cells,block_content -->\n"
+        '<table><tr><td colspan="2">Region</td></tr>'
+        "<tr><td>US</td><td>10</td></tr></table>\n"
+    )
+
+
+def test_rowless_table_under_force_md_falls_back_without_raising() -> None:
+    # A <table> with no rows: analyze_table succeeds (needs_html False), then
+    # table_to_markdown raises "no rows" inside the force="md" branch. The router
+    # must catch it and fall back to text — the ValueError must never escape.
+    assert render([EMPTY_TABLE], annotate=True, force="md") == (
+        "<!-- hybridmd: table format=text reasons=no_html -->\nfallback text\n"
+    )
+    assert render([EMPTY_TABLE], force="md") == "fallback text\n"
 
 
 def test_empty_sequence_is_empty_string() -> None:
