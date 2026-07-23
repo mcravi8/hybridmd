@@ -38,6 +38,9 @@ Homepage = "https://github.com/mcravi8/hybridmd"
 Repository = "https://github.com/mcravi8/hybridmd"
 Issues = "https://github.com/mcravi8/hybridmd/issues"
 
+[project.scripts]
+hybridmd = "hybridmd.cli:run"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/hybridmd"]
 
