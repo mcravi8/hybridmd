@@ -117,12 +117,19 @@ def test_nested_table_inner_structure_does_not_leak() -> None:
 @pytest.mark.parametrize(
     ("value", "is_merged"),
     [
+        # Existing malformed cases — behaviour unchanged under the HTML5 rule.
         ("abc", False),
         ("", False),
         ("0", False),
         ("-1", False),
-        ("2.5", False),
         (" 3 ", True),
+        # HTML5 leading-digit-run rule: consume leading ASCII digits, drop rest.
+        ("2abc", True),  # trailing garbage ignored, spans 2 columns (browser: 2)
+        ("2.5", True),  # leading run "2" -> merged (was 1 under the old int())
+        ("3 ", True),
+        ("abc2", False),  # no leading digit -> 1
+        ("1_000", False),  # underscore is not an ASCII digit; run is "1" -> 1
+        ("٣", False),  # non-ASCII digit; [0-9] does not match it
     ],
 )
 def test_malformed_span_values(value: str, is_merged: bool) -> None:

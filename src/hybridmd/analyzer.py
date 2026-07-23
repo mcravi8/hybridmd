@@ -12,6 +12,7 @@ The analysis is deliberately conservative and self-contained: it depends only on
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from enum import Enum
 
@@ -19,6 +20,12 @@ from bs4 import BeautifulSoup, Tag
 
 # Block-level tags whose presence in a cell defeats an inline Markdown cell.
 _BLOCK_TAGS = ["p", "ul", "ol", "div"]
+
+# Longest leading run of ASCII digits, per the HTML5 "rules for parsing
+# non-negative integers". Deliberately ``[0-9]`` rather than ``\d`` so that
+# non-ASCII digits are rejected, and with no underscore handling (unlike
+# ``int()``), because HTML recognises neither.
+_LEADING_ASCII_DIGITS = re.compile(r"[0-9]+")
 
 
 class Reason(str, Enum):
@@ -56,19 +63,26 @@ class TableAnalysis:
 def _parse_span(raw: object) -> int:
     """Resolve a ``colspan``/``rowspan`` attribute to an effective span (>= 1).
 
-    Extractor output is frequently malformed, so this never raises. Any value
-    that is not a base-10 integer greater than one resolves to ``1`` (i.e. *not*
-    merged): non-string, empty, whitespace-only, non-numeric, float-like, zero
-    and negative values all collapse to ``1``. Surrounding whitespace is
-    stripped before parsing.
+    Follows the HTML5 *rules for parsing non-negative integers*: after stripping
+    surrounding whitespace, the longest leading run of ASCII digits is consumed
+    and the remainder ignored — so ``"2abc"`` resolves to ``2``, exactly as a
+    browser renders ``colspan="2abc"``. This is the safe direction: a real span
+    that trails garbage stays detected as merged rather than being lost.
+
+    Parsing is deliberately ASCII-only. Underscores (``int("1_000")``) and
+    non-ASCII digits (``int("٣")``) — both of which Python's ``int()`` accepts —
+    are *not* treated as digits, because HTML does not recognise them.
+
+    Extractor output is frequently malformed, so this never raises. Anything
+    with no leading ASCII digit, or a value ``<= 1`` (zero, one, negative, or a
+    non-string input), resolves to ``1`` (i.e. *not* merged).
     """
     if not isinstance(raw, str):
         return 1
-    try:
-        value = int(raw.strip())
-    except ValueError:
+    match = _LEADING_ASCII_DIGITS.match(raw.strip())
+    if match is None:
         return 1
-    return max(value, 1)
+    return max(int(match.group()), 1)
 
 
 def _nearest_table(element: Tag) -> Tag | None:
