@@ -71,9 +71,9 @@ def _heading_level(depth: Any) -> int:
     Absent or non-integer depth (``bool`` is not accepted as an integer here)
     defaults to the top level, 1.
     """
-    if isinstance(depth, bool) or not isinstance(depth, int):
-        return _MIN_LEVEL
-    return min(max(depth + 1, _MIN_LEVEL), _MAX_LEVEL)
+    if isinstance(depth, int) and not isinstance(depth, bool):
+        return min(max(depth + 1, _MIN_LEVEL), _MAX_LEVEL)
+    return _MIN_LEVEL
 
 
 def from_unstructured(elements: Iterable[Any]) -> list[DocElement]:
