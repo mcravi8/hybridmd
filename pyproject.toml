@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hybridmd"
-version = "0.0.1"
+version = "0.1.0"
 description = "Convert parsed document elements into hybrid Markdown: Markdown where it's lossless, sanitized embedded HTML only for tables Markdown cannot represent."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -46,6 +46,22 @@ hybridmd = "hybridmd.cli:run"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/hybridmd"]
+
+# Explicit allow-list so the sdist ships exactly what belongs there and never
+# sweeps in local tooling files (e.g. .claude/) that hatchling would otherwise
+# include because they are ignored only by a global, not the repo's, gitignore.
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/hybridmd",
+  "tests",
+  "examples",
+  "scripts",
+  "CHANGELOG.md",
+  "CLAUDE.md",
+  "LICENSE",
+  "README.md",
+  "pyproject.toml",
+]
 
 [tool.ruff]
 line-length = 88
