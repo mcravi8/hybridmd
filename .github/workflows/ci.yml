@@ -43,3 +43,31 @@ jobs:
 
       - name: pytest
         run: pytest
+
+  integration:
+    # The core gate above deliberately never installs a backend, which keeps it
+    # fast and dependency-free — and also means it cannot see the backend at all.
+    # That blind spot is how a CLI default that silently discarded every table in
+    # a document survived a fully green suite. This job is the counterweight: one
+    # Python, real Unstructured, asserting tables actually survive the round trip.
+    # The PDF extra is deliberately omitted — it pulls a multi-hundred-MB model
+    # stack, and the HTML/PPTX paths exercise the same seam.
+    name: Integration (real Unstructured backend)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install package with the real backend
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev,unstructured,unstructured-pptx]"
+
+      - name: pytest (integration only)
+        run: pytest -m integration

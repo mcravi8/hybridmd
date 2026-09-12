@@ -87,3 +87,6 @@ minversion = "8.0"
 addopts = ["-ra", "--strict-markers", "--strict-config"]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+  "integration: exercises the real Unstructured backend; skipped unless the optional extras are installed",
+]
