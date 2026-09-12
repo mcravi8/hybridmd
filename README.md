@@ -144,11 +144,33 @@ With `annotate=True`, each table is preceded by a machine-readable marker on its
 
 It exists for two reasons. Downstream chunkers can treat each table as an **atomic chunk** — keying off the marker to never split a table mid-way. And lossy benchmark runs are **self-documenting**: under `force="md"` the marker still reports the analyzer's real reasons (e.g. `format=md reasons=merged_cells forced=true`), recording exactly which tables were mangled.
 
+Reasons come in two kinds. **Blocking** reasons — `merged_cells`, `nested_table`, `ragged_rows`, `multi_row_header`, `block_content` — mean Markdown would lose structure, so the table is routed to HTML. **Advisory** reasons are reported *without* forcing HTML, because HTML would not fix what they describe:
+
+| advisory reason | meaning |
+| --- | --- |
+| `no_header` | the table marks no header row (no `<thead>`, no all-`<th>` first row), so an empty Markdown header is emitted rather than promoting data |
+| `single_column` | no row has more than one cell — usually a caption or label that layout detection boxed as a table, not tabular data at all |
+
 ## Design decisions
 
 - **bs4-only core.** The core package depends only on `beautifulsoup4`; backend adapters and dev tooling live behind optional extras, so a core install and core CI stay lean.
 - **HTML5 span parsing, not `int()`.** `colspan`/`rowspan` are parsed by the HTML5 "rules for parsing non-negative integers" — the longest leading run of ASCII digits — because a browser renders `colspan="2abc"` as `2`. Plain `int()` raises on that and would fall back to "not merged", which is the **unsafe** direction: under-detecting a merged cell emits lossy Markdown, whereas over-detecting merely routes to (lossless) HTML.
-- **Force modes are for benchmarking.** `force="html"` and `force="md"` override the analyzer for measurement only; `force="md"` is documented as explicitly lossy and exists to quantify the tradeoff, not for production use.
+- **Force modes are for benchmarking.** `force="html"` and `force="md"` override the analyzer for measurement only; `force="md"` is documented as explicitly lossy and exists to quantify the tradeoff, not for production use. The CLI warns on stderr when you use it.
+- **A missing header is never invented.** Markdown pipe tables require a header row, but a table whose cells are all `<td>` asserts no header — and table-structure inference emits those constantly. Promoting its first row would silently relabel data as column headings (a regression-coefficient row becoming a header, say). hybridmd emits an **empty** header instead and flags `no_header`: an empty header asserts nothing, where a guessed one asserts something false.
+- **Accuracy over speed at the CLI boundary.** `hybridmd document.pdf` defaults to the backend's `hi_res` strategy with table-structure inference on. The backend's own default resolves to a fast, text-only path on text-based PDFs that performs no layout analysis, so every table is flattened into prose before hybridmd sees it — a tool about table fidelity should not ship a default that discards tables. `--strategy fast` is still there when you want it.
+
+## What hybridmd does not do
+
+**hybridmd preserves structure, not content.** Its guarantees are entirely about shape — merged cells, nesting, header rows, column counts. It has no view on whether the *text* in those cells is correct, and it cannot acquire one.
+
+This matters because the text often isn't. OCR and layout models mangle real documents in ways that produce perfectly well-formed tables full of wrong values — `$10,000` arriving as `Brsr4 10000 Brora`, stray `|` characters inserted mid-word, columns of numbers reversed. hybridmd will route such a table correctly, sanitize it, annotate it with confident reasons, and hand you structurally impeccable garbage. **A clean marker is not a statement that the contents are right.**
+
+Two consequences worth internalising:
+
+- **Extraction quality is upstream and dominates.** What reaches the analyzer is only ever as good as the backend that produced it. If a table never becomes a `Table` element, hybridmd cannot route what it never receives.
+- **Some backends discard structure before hybridmd sees it.** Unstructured's *HTML* partitioner, for instance, rewrites tables into bare `<tr><td>` grids — `colspan`/`rowspan` dropped, `thead`/`th` flattened. Merged cells on that path are undetectable in principle, not by oversight. (The PDF `hi_res` path does preserve spans.) `tests/integration/` pins this behaviour so a change upstream is noticed.
+
+If you need content-level validation — numeric checks, caption binding, footnote resolution — that belongs in a layer above this one, and is explicitly out of scope here.
 
 ## Roadmap
 
