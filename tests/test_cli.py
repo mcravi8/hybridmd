@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -242,3 +243,114 @@ def test_argparse_usage_errors_exit_code_2(argv) -> None:
     with pytest.raises(SystemExit) as exc:
         main(argv)
     assert exc.value.code == 2
+
+
+# --- backend plumbing -------------------------------------------------------
+#
+# What the CLI *asks the backend for* is load-bearing: a strategy that skips
+# layout analysis silently flattens every table into prose long before the
+# router sees it, and no amount of downstream testing can notice. These tests
+# pin those arguments using a fake module, so they run in core CI — which
+# deliberately never installs the real backend, and is exactly where such a
+# regression would otherwise pass unnoticed.
+
+
+class _FakeAuto:
+    """Stand-in for ``unstructured.partition.auto`` that records its kwargs."""
+
+    def __init__(self, elements: list[object] | None = None) -> None:
+        self.calls: list[dict[str, object]] = []
+        self._elements: list[object] = elements if elements is not None else []
+
+    def partition(self, **kwargs: object) -> list[object]:
+        self.calls.append(kwargs)
+        return self._elements
+
+
+def _fake_backend(monkeypatch, module: object) -> None:
+    monkeypatch.setitem(sys.modules, "unstructured.partition.auto", module)
+
+
+def _document(tmp_path: Path) -> Path:
+    doc = tmp_path / "report.pdf"
+    doc.write_bytes(b"%PDF-1.4")
+    return doc
+
+
+def test_document_input_defaults_to_hi_res_with_table_structure(
+    tmp_path, monkeypatch
+) -> None:
+    fake = _FakeAuto()
+    _fake_backend(monkeypatch, fake)
+    assert main([str(_document(tmp_path))]) == 0
+    (call,) = fake.calls
+    assert call["strategy"] == "hi_res"
+    assert call["infer_table_structure"] is True
+
+
+def test_strategy_flag_overrides_the_default(tmp_path, monkeypatch) -> None:
+    fake = _FakeAuto()
+    _fake_backend(monkeypatch, fake)
+    assert main([str(_document(tmp_path)), "--strategy", "fast"]) == 0
+    assert fake.calls[0]["strategy"] == "fast"
+
+
+def test_no_table_structure_flag_disables_inference(tmp_path, monkeypatch) -> None:
+    fake = _FakeAuto()
+    _fake_backend(monkeypatch, fake)
+    assert main([str(_document(tmp_path)), "--no-table-structure"]) == 0
+    assert fake.calls[0]["infer_table_structure"] is False
+
+
+def test_json_input_never_reaches_the_backend(tmp_path, monkeypatch) -> None:
+    fake = _FakeAuto()
+    _fake_backend(monkeypatch, fake)
+    assert main([str(_write(tmp_path / "doc.json", DOC_ELEMENTS))]) == 0
+    assert fake.calls == []
+
+
+def test_missing_format_extra_is_reported_cleanly(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    # The backend raises ImportError from *inside* partition() when the package
+    # is installed but that format's extra is not — a path that used to escape
+    # as a traceback rather than a CLI error.
+    class _Raising:
+        @staticmethod
+        def partition(**kwargs: object) -> list[object]:
+            raise ImportError("partition_pdf() is not available")
+
+    _fake_backend(monkeypatch, _Raising())
+    assert main([str(_document(tmp_path))]) == 1
+    err = capsys.readouterr().err
+    assert "partition_pdf() is not available" in err
+    assert "hybridmd[unstructured-pdf]" in err
+    assert "Traceback" not in err
+
+
+def test_weak_strategy_finding_no_tables_warns(tmp_path, monkeypatch, capsys) -> None:
+    _fake_backend(monkeypatch, _FakeAuto())
+    assert main([str(_document(tmp_path)), "--strategy", "fast"]) == 0
+    assert "no tables detected" in capsys.readouterr().err
+
+
+def test_hi_res_finding_no_tables_stays_quiet(tmp_path, monkeypatch, capsys) -> None:
+    # Under hi_res, "no tables" is a trustworthy answer rather than an artifact.
+    _fake_backend(monkeypatch, _FakeAuto())
+    assert main([str(_document(tmp_path))]) == 0
+    assert "no tables detected" not in capsys.readouterr().err
+
+
+def test_force_md_warns_that_it_is_lossy(tmp_path, capsys) -> None:
+    path = _write(tmp_path / "doc.json", DOC_ELEMENTS)
+    assert main([str(path), "--force", "md"]) == 0
+    captured = capsys.readouterr()
+    assert "lossy" in captured.err
+    # The warning must never contaminate the document on stdout.
+    assert "warning" not in captured.out
+
+
+def test_force_html_does_not_warn(tmp_path, capsys) -> None:
+    path = _write(tmp_path / "doc.json", DOC_ELEMENTS)
+    assert main([str(path), "--force", "html"]) == 0
+    assert "lossy" not in capsys.readouterr().err

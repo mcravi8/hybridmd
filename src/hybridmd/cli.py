@@ -6,7 +6,9 @@ when a non-JSON input is given, so core usage never needs it.
 
 Usage::
 
-    hybridmd INPUT [-o OUT] [--annotate] [--force {md,html}] [--version]
+    hybridmd INPUT [-o OUT] [--annotate] [--force {md,html}]
+             [--strategy {auto,fast,hi_res,ocr_only}] [--no-table-structure]
+             [--version]
 
 ``main`` returns the process exit code rather than calling :func:`sys.exit`, so
 every path is testable in-process; the thin :func:`run` entry point does the
@@ -31,8 +33,19 @@ from hybridmd.schema import DocElement, ElementType
 # The lowercase snake_case values that identify a hybridmd DocElement dict.
 _ELEMENT_TYPE_VALUES = frozenset(member.value for member in ElementType)
 _INSTALL_HINT = (
-    'install the optional backend with: pip install "hybridmd[unstructured]"'
+    'install the optional backend with: pip install "hybridmd[unstructured]" — '
+    "binary formats additionally need that format's own extra, e.g. "
+    '"hybridmd[unstructured-pdf]" or "hybridmd[unstructured-pptx]"'
 )
+
+# Table detection is the whole point of this tool, so the CLI defaults to the
+# accurate-but-slower backend strategy rather than the backend's own "auto".
+# `auto` resolves to a fast, text-only path for text-based PDFs, which performs
+# no layout analysis at all: every table is flattened into prose before hybridmd
+# ever sees it, so the router silently has nothing to route. Correctness first;
+# `--strategy fast` remains available for callers who want the speed.
+_DEFAULT_STRATEGY = "hi_res"
+_STRATEGIES = ("auto", "fast", "hi_res", "ocr_only")
 
 
 class _CliError(Exception):
@@ -67,6 +80,22 @@ def _build_parser() -> argparse.ArgumentParser:
         "--force",
         choices=("md", "html"),
         help='force every usable-html table to "md" (lossy) or "html"',
+    )
+    parser.add_argument(
+        "--strategy",
+        choices=_STRATEGIES,
+        default=_DEFAULT_STRATEGY,
+        help=(
+            "backend parsing strategy for non-JSON documents "
+            f"(default: {_DEFAULT_STRATEGY}). "
+            '"fast" and "auto" skip layout analysis on text-based PDFs and '
+            "will miss their tables entirely"
+        ),
+    )
+    parser.add_argument(
+        "--no-table-structure",
+        action="store_true",
+        help="do not ask the backend to infer table structure (not recommended)",
     )
     parser.add_argument("--version", action="version", version=__version__)
     return parser
@@ -129,21 +158,67 @@ def _load_json(path: Path) -> list[DocElement]:
     return _dispatch_json(data, path)
 
 
-def _load_via_unstructured(path: Path) -> list[DocElement]:
+def _load_via_unstructured(
+    path: Path, *, strategy: str, infer_table_structure: bool
+) -> list[DocElement]:
+    """Parse *path* with the optional backend, surfacing both ImportError paths.
+
+    The backend raises ImportError twice over: once at import time when it is not
+    installed at all, and again at *partition* time when the package is present
+    but that document's format extra is not. The second is easy to miss — it
+    escapes as a traceback rather than a clean CLI error — so both are caught.
+    """
     try:
         partition = import_module("unstructured.partition.auto").partition
     except ImportError as exc:  # backend (or a dependency of it) not installed
         raise _CliError(_INSTALL_HINT) from exc
-    return from_unstructured(partition(filename=str(path)))
+    try:
+        elements = partition(
+            filename=str(path),
+            strategy=strategy,
+            infer_table_structure=infer_table_structure,
+        )
+    except ImportError as exc:  # backend present, this format's extra is not
+        raise _CliError(f"{exc}; {_INSTALL_HINT}") from exc
+    return from_unstructured(elements)
 
 
-def _load_elements(input_path: str) -> list[DocElement]:
+def _load_elements(
+    input_path: str, *, strategy: str, infer_table_structure: bool
+) -> list[DocElement]:
     path = Path(input_path)
     if not path.exists():
         raise _CliError(f"input file not found: {input_path}")
     if input_path.endswith(".json"):
         return _load_json(path)
-    return _load_via_unstructured(path)
+    return _load_via_unstructured(
+        path, strategy=strategy, infer_table_structure=infer_table_structure
+    )
+
+
+def _warn(message: str) -> None:
+    """Emit one advisory line to stderr, leaving stdout to carry the document."""
+    print(f"hybridmd: warning: {message}", file=sys.stderr)
+
+
+def _warn_on_missing_tables(elements: Sequence[DocElement], strategy: str) -> None:
+    """Flag the silent-table-loss case: a weak strategy that found no tables.
+
+    A strategy that skips layout analysis cannot report that it skipped it — the
+    document simply arrives with every table flattened into prose, and hybridmd
+    has nothing to route. Zero tables under such a strategy is therefore
+    ambiguous in the one direction that matters, so say so. Under ``hi_res`` the
+    same result is trustworthy and stays silent.
+    """
+    if strategy == "hi_res":
+        return
+    if any(el.type is ElementType.TABLE for el in elements):
+        return
+    _warn(
+        f"no tables detected using --strategy {strategy}; this strategy skips "
+        "layout analysis, so any tables in the document were flattened into "
+        "text. Re-run with --strategy hi_res to detect them"
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -155,11 +230,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     unexpected exceptions are left to propagate.
     """
     args = _build_parser().parse_args(argv)
+    if args.force == "md":
+        _warn(
+            'force="md" is explicitly lossy: tables that need HTML will be '
+            "emitted as Markdown anyway and silently corrupted. It exists to "
+            "quantify the tradeoff, not for production use"
+        )
     try:
-        elements = _load_elements(args.input)
+        elements = _load_elements(
+            args.input,
+            strategy=args.strategy,
+            infer_table_structure=not args.no_table_structure,
+        )
     except _CliError as exc:
         print(f"hybridmd: error: {exc}", file=sys.stderr)
         return 1
+    if not args.input.endswith(".json"):
+        _warn_on_missing_tables(elements, args.strategy)
     document = render(elements, annotate=args.annotate, force=args.force)
     if args.output is not None:
         try:
