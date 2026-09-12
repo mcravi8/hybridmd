@@ -29,11 +29,22 @@ _LEADING_ASCII_DIGITS = re.compile(r"[0-9]+")
 
 
 class Reason(str, Enum):
-    """Why a table cannot be represented with Markdown pipe syntax.
+    """Something notable about a table's structure.
 
     Members are ``str``-valued so they serialize transparently to JSON. The
     *declaration order below is significant*: :attr:`TableAnalysis.reasons` is
     always ordered by it, never by the order in which reasons are discovered.
+
+    Reasons are of two kinds:
+
+    * **Blocking** (the first five) — Markdown pipe syntax cannot hold the
+      structure, so the table must fall back to embedded HTML.
+    * **Advisory** (:attr:`NO_HEADER`, :attr:`SINGLE_COLUMN`; see
+      :data:`_ADVISORY_REASONS`) — Markdown *can* hold the table, but something
+      about it is worth surfacing. These deliberately do **not** force HTML:
+      emitting HTML would not make a missing header any more known, it would
+      only cost tokens. They are reported so the caveat travels with the table
+      instead of vanishing.
     """
 
     MERGED_CELLS = "merged_cells"
@@ -41,6 +52,12 @@ class Reason(str, Enum):
     RAGGED_ROWS = "ragged_rows"
     MULTI_ROW_HEADER = "multi_row_header"
     BLOCK_CONTENT = "block_content"
+    NO_HEADER = "no_header"
+    SINGLE_COLUMN = "single_column"
+
+
+# Reported, but never a reason to fall back to HTML. See `Reason`.
+_ADVISORY_REASONS = frozenset({Reason.NO_HEADER, Reason.SINGLE_COLUMN})
 
 
 @dataclass(frozen=True)
@@ -48,12 +65,14 @@ class TableAnalysis:
     """The verdict for a single table.
 
     Attributes:
-        needs_html: ``True`` iff at least one :class:`Reason` was found — i.e.
-            Markdown pipe syntax would be lossy and the table must fall back to
-            embedded HTML.
-        reasons: The reasons the table needs HTML, as a tuple in :class:`Reason`
-            *declaration order* (deterministic, never discovery order). Empty
-            iff ``needs_html`` is ``False``.
+        needs_html: ``True`` iff at least one *blocking* :class:`Reason` was
+            found — i.e. Markdown pipe syntax would be lossy and the table must
+            fall back to embedded HTML. Advisory reasons alone leave this
+            ``False``.
+        reasons: Every reason found, blocking and advisory alike, as a tuple in
+            :class:`Reason` *declaration order* (deterministic, never discovery
+            order). May be non-empty while ``needs_html`` is ``False``, when only
+            advisory reasons apply.
     """
 
     needs_html: bool
@@ -108,6 +127,25 @@ def _owned(nodes: list[Tag], target: Tag) -> list[Tag]:
     return [node for node in nodes if _nearest_table(node) is target]
 
 
+def _has_header_row(target: Tag, rows: list[Tag]) -> bool:
+    """Whether *target* marks a header row explicitly, rather than implying one.
+
+    ``True`` when a ``<thead>`` holds at least one row, or when every cell of the
+    first row is a ``<th>``. Anything else — most often a table whose every cell
+    is a ``<td>``, which is what table-structure inference tends to emit — has no
+    header that the *markup* asserts, only one a reader might assume. Treating
+    such a first row as a header is a guess, and a costly one when it is wrong:
+    a data row silently becomes a column label. This function declines to guess.
+    """
+    for thead in _owned(_find_tags(target, ["thead"]), target):
+        if _owned(_find_tags(thead, ["tr"]), target):
+            return True
+    if not rows:
+        return False
+    first_cells = _owned(_find_tags(rows[0], ["td", "th"]), target)
+    return bool(first_cells) and all(cell.name == "th" for cell in first_cells)
+
+
 def analyze_table(html: str) -> TableAnalysis:
     """Analyze the first ``<table>`` in *html* for Markdown representability.
 
@@ -132,12 +170,22 @@ def analyze_table(html: str) -> TableAnalysis:
     * ``RAGGED_ROWS`` — *only when no merged cells are present* — rows (``thead``
       and ``tbody`` counted together) with differing cell counts.
 
+    And the two advisory reasons, which are reported without forcing HTML:
+
+    * ``NO_HEADER`` — neither a ``<thead>`` with a row nor an all-``<th>`` first
+      row, so the table asserts no header (see :func:`_has_header_row`).
+    * ``SINGLE_COLUMN`` — no row has more than one cell. Such a "table" is
+      usually not tabular at all but a caption, label, or heading that layout
+      detection boxed as a table; Markdown renders it fine, so this is a flag for
+      the reader rather than a routing decision.
+
     Args:
         html: A fragment or document containing at least one ``<table>``.
 
     Returns:
-        A :class:`TableAnalysis`. ``needs_html`` is ``True`` iff ``reasons`` is
-        non-empty; ``reasons`` is ordered by :class:`Reason` declaration order.
+        A :class:`TableAnalysis`. ``needs_html`` is ``True`` iff a *blocking*
+        reason was found — advisory reasons alone leave it ``False`` — and
+        ``reasons`` is ordered by :class:`Reason` declaration order.
 
     Raises:
         ValueError: If *html* contains no ``<table>`` element.
@@ -148,6 +196,7 @@ def analyze_table(html: str) -> TableAnalysis:
 
     cells = _owned(_find_tags(target, ["td", "th"]), target)
     rows = _owned(_find_tags(target, ["tr"]), target)
+    row_widths = [len(_owned(_find_tags(row, ["td", "th"]), target)) for row in rows]
 
     detected: set[Reason] = set()
 
@@ -173,10 +222,15 @@ def analyze_table(html: str) -> TableAnalysis:
             detected.add(Reason.BLOCK_CONTENT)
             break
 
-    if not merged:
-        widths = {len(_owned(_find_tags(row, ["td", "th"]), target)) for row in rows}
-        if len(widths) > 1:
-            detected.add(Reason.RAGGED_ROWS)
+    if not merged and len(set(row_widths)) > 1:
+        detected.add(Reason.RAGGED_ROWS)
+
+    if not _has_header_row(target, rows):
+        detected.add(Reason.NO_HEADER)
+
+    if row_widths and max(row_widths) <= 1:
+        detected.add(Reason.SINGLE_COLUMN)
 
     reasons = tuple(reason for reason in Reason if reason in detected)
-    return TableAnalysis(needs_html=bool(reasons), reasons=reasons)
+    needs_html = any(reason not in _ADVISORY_REASONS for reason in reasons)
+    return TableAnalysis(needs_html=needs_html, reasons=reasons)

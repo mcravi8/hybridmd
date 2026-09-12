@@ -86,21 +86,23 @@ def test_mixed_document_with_annotations() -> None:
         "| --- | --- |\n"
         "| US | 10 |\n"
         "\n"
-        "<!-- hybridmd: table format=html reasons=merged_cells -->\n"
+        "<!-- hybridmd: table format=html reasons=merged_cells,no_header -->\n"
         '<table><tr><td colspan="2">Region</td></tr>'
         "<tr><td>US</td><td>10</td></tr></table>\n"
     )
 
 
 def test_force_md_is_lossy_and_reports_real_reasons() -> None:
-    # force="md" overrides the analyzer on the merged table: the colspan header
-    # collapses to one column over a two-column body — explicitly lossy. The
-    # marker still reports the analyzer's real reasons (merged_cells), so the
-    # lossy arm records exactly which tables it mangled.
+    # force="md" overrides the analyzer on the merged table: the colspan is
+    # dropped, leaving a one-cell row over a two-cell body — explicitly lossy.
+    # The marker still reports the analyzer's real reasons, so the lossy arm
+    # records exactly which tables it mangled.
     assert render([MERGED_TABLE], annotate=True, force="md") == (
-        "<!-- hybridmd: table format=md reasons=merged_cells forced=true -->\n"
+        "<!-- hybridmd: table format=md reasons=merged_cells,no_header "
+        "forced=true -->\n"
+        "|  |  |\n"
+        "| --- | --- |\n"
         "| Region |\n"
-        "| --- |\n"
         "| US | 10 |\n"
     )
 
@@ -117,7 +119,8 @@ def test_force_html_on_simple_table_reports_no_reasons() -> None:
 def test_force_html_reports_analyzer_reasons() -> None:
     # The analyzer runs even when forcing html: reasons are reported regardless.
     assert render([MERGED_TABLE], annotate=True, force="html") == (
-        "<!-- hybridmd: table format=html reasons=merged_cells forced=true -->\n"
+        "<!-- hybridmd: table format=html reasons=merged_cells,no_header "
+        "forced=true -->\n"
         '<table><tr><td colspan="2">Region</td></tr>'
         "<tr><td>US</td><td>10</td></tr></table>\n"
     )
@@ -141,7 +144,8 @@ def test_marker_lists_multiple_reasons_in_declaration_order() -> None:
     # analyzer reasons; the marker joins them in Reason DECLARATION order
     # (merged_cells before block_content), never sorted or discovery order.
     assert render([MULTI_REASON_TABLE], annotate=True) == (
-        "<!-- hybridmd: table format=html reasons=merged_cells,block_content -->\n"
+        "<!-- hybridmd: table format=html "
+        "reasons=merged_cells,block_content,no_header -->\n"
         '<table><tr><td colspan="2">Region</td></tr>'
         "<tr><td>US</td><td>10</td></tr></table>\n"
     )

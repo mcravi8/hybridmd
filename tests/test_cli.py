@@ -90,7 +90,10 @@ def test_output_to_stdout(tmp_path, capsys) -> None:
 def test_annotate_is_plumbed_through(tmp_path, capsys) -> None:
     path = _write(tmp_path / "doc.json", DOC_ELEMENTS)
     assert main([str(path), "--annotate"]) == 0
-    assert "<!-- hybridmd: table format=md reasons=none -->" in capsys.readouterr().out
+    # The fixture table is one column wide, which is advisory-flagged; it still
+    # routes to md, which is what this test is really checking.
+    out = capsys.readouterr().out
+    assert "<!-- hybridmd: table format=md reasons=single_column -->" in out
 
 
 def test_force_html_is_plumbed_through(tmp_path, capsys) -> None:
@@ -119,7 +122,7 @@ def test_force_md_is_plumbed_through(tmp_path, capsys) -> None:
     )
     assert main([str(merged), "--annotate", "--force", "md"]) == 0
     out = capsys.readouterr().out
-    assert "format=md reasons=merged_cells forced=true" in out
+    assert "format=md reasons=merged_cells,no_header forced=true" in out
 
 
 def test_version_prints_version_and_exits_zero(capsys) -> None:

@@ -42,19 +42,27 @@ def test_reexported_from_package_root() -> None:
 
 
 def test_merged_cells_via_colspan() -> None:
-    assert analyze_table(MERGED).reasons == (Reason.MERGED_CELLS,)
+    # These fixtures are all-<td>, so NO_HEADER rides along on every one of them.
+    assert analyze_table(MERGED).reasons == (Reason.MERGED_CELLS, Reason.NO_HEADER)
 
 
 def test_merged_cells_via_rowspan() -> None:
-    assert analyze_table(ROWSPAN_MERGED).reasons == (Reason.MERGED_CELLS,)
+    assert analyze_table(ROWSPAN_MERGED).reasons == (
+        Reason.MERGED_CELLS,
+        Reason.NO_HEADER,
+    )
 
 
 def test_nested_table() -> None:
-    assert analyze_table(NESTED).reasons == (Reason.NESTED_TABLE,)
+    assert analyze_table(NESTED).reasons == (
+        Reason.NESTED_TABLE,
+        Reason.NO_HEADER,
+        Reason.SINGLE_COLUMN,
+    )
 
 
 def test_ragged_rows() -> None:
-    assert analyze_table(RAGGED).reasons == (Reason.RAGGED_ROWS,)
+    assert analyze_table(RAGGED).reasons == (Reason.RAGGED_ROWS, Reason.NO_HEADER)
 
 
 def test_multi_row_header() -> None:
@@ -62,11 +70,19 @@ def test_multi_row_header() -> None:
 
 
 def test_block_content_paragraph() -> None:
-    assert analyze_table(BLOCK_PARAGRAPH).reasons == (Reason.BLOCK_CONTENT,)
+    assert analyze_table(BLOCK_PARAGRAPH).reasons == (
+        Reason.BLOCK_CONTENT,
+        Reason.NO_HEADER,
+        Reason.SINGLE_COLUMN,
+    )
 
 
 def test_block_content_multiple_br() -> None:
-    assert analyze_table(BLOCK_MULTI_BR).reasons == (Reason.BLOCK_CONTENT,)
+    assert analyze_table(BLOCK_MULTI_BR).reasons == (
+        Reason.BLOCK_CONTENT,
+        Reason.NO_HEADER,
+        Reason.SINGLE_COLUMN,
+    )
 
 
 def test_single_br_is_not_block_content() -> None:
@@ -80,11 +96,32 @@ def test_clean_table_needs_no_html() -> None:
     assert analysis.reasons == ()
 
 
-def test_table_with_no_thead_is_clean() -> None:
+def test_table_with_no_thead_is_flagged_but_stays_markdown() -> None:
+    # NO_HEADER is advisory: it is reported so the caveat is visible, but it must
+    # not push an otherwise-simple table into the (lossless, costlier) HTML path.
     analysis = analyze_table(NO_THEAD)
     assert analysis.needs_html is False
-    assert analysis.reasons == ()
+    assert analysis.reasons == (Reason.NO_HEADER,)
     assert Reason.MULTI_ROW_HEADER not in analysis.reasons
+
+
+def test_all_th_first_row_counts_as_a_header_without_thead() -> None:
+    html = "<table><tr><th>H1</th><th>H2</th></tr><tr><td>a</td><td>b</td></tr></table>"
+    assert analyze_table(html).reasons == ()
+
+
+def test_single_column_table_is_flagged_but_stays_markdown() -> None:
+    # A one-column "table" is usually a caption or label that layout detection
+    # boxed as tabular. Advisory only — Markdown renders it perfectly well.
+    analysis = analyze_table("<table><tr><td>Panel A: Sorts on ATMIV</td></tr></table>")
+    assert analysis.needs_html is False
+    assert Reason.SINGLE_COLUMN in analysis.reasons
+
+
+def test_advisory_reasons_alone_never_force_html() -> None:
+    analysis = analyze_table(NO_THEAD)
+    assert analysis.reasons != ()
+    assert analysis.needs_html is False
 
 
 def test_no_table_raises_value_error() -> None:
@@ -109,7 +146,11 @@ def test_nested_table_inner_structure_does_not_leak() -> None:
         "</td></tr></table>"
     )
     analysis = analyze_table(html)
-    assert analysis.reasons == (Reason.NESTED_TABLE,)
+    assert analysis.reasons == (
+        Reason.NESTED_TABLE,
+        Reason.NO_HEADER,
+        Reason.SINGLE_COLUMN,
+    )
     assert Reason.MERGED_CELLS not in analysis.reasons
     assert Reason.RAGGED_ROWS not in analysis.reasons
 

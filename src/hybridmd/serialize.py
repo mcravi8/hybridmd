@@ -59,6 +59,12 @@ def _pipe_row(cells: list[str]) -> str:
     return "| " + " | ".join(cells) + " |"
 
 
+def _is_all_th(row: Tag) -> bool:
+    """Whether *row* is a header row by markup: non-empty and every cell a ``th``."""
+    cells = [cell for cell in row.find_all(["td", "th"]) if isinstance(cell, Tag)]
+    return bool(cells) and all(cell.name == "th" for cell in cells)
+
+
 def table_to_markdown(html: str) -> str:
     """Render a *simple* table as a GitHub-flavored Markdown pipe table.
 
@@ -69,11 +75,19 @@ def table_to_markdown(html: str) -> str:
         multi-row header, block content) is **undefined and lossy** — such
         tables must go through :func:`sanitize_table_html` instead.
 
-    The header row is the ``<thead>``'s row if a ``<thead>`` is present,
-    otherwise the first row. Cell text has surrounding whitespace stripped and
-    internal whitespace collapsed to single spaces; ``|`` is escaped as ``\\|``;
-    empty cells are permitted. A delimiter row matching the header's column
-    count is emitted between the header and the body.
+    The header row is the ``<thead>``'s row if a ``<thead>`` is present, else the
+    first row if every one of its cells is a ``<th>``. If the table marks no
+    header either way, **an empty header row is emitted and every row is treated
+    as a body row**. Markdown pipe syntax requires *some* header, but inventing
+    one out of the first row would silently relabel data as column headings —
+    a real risk, since table-structure inference routinely emits tables whose
+    every cell is a ``<td>``. An empty header asserts nothing; the accompanying
+    :attr:`~hybridmd.analyzer.Reason.NO_HEADER` records why it is empty.
+
+    Cell text has surrounding whitespace stripped and internal whitespace
+    collapsed to single spaces; ``|`` is escaped as ``\\|``; empty cells are
+    permitted. A delimiter row matching the header's column count is emitted
+    between the header and the body.
 
     Args:
         html: HTML containing the simple table to render.
@@ -90,15 +104,22 @@ def table_to_markdown(html: str) -> str:
     if not rows:
         raise ValueError("table has no rows to render")
 
-    header_row = rows[0]
+    header_row: Tag | None = None
     thead = table.find("thead")
     if isinstance(thead, Tag):
         thead_row = thead.find("tr")
         if isinstance(thead_row, Tag):
             header_row = thead_row
+    if header_row is None and _is_all_th(rows[0]):
+        header_row = rows[0]
 
-    header_cells = _row_cells(header_row)
-    body_rows = [row for row in rows if row is not header_row]
+    if header_row is None:
+        # No header asserted: emit a blank one rather than promoting data.
+        header_cells = [""] * max(len(_row_cells(row)) for row in rows)
+        body_rows = rows
+    else:
+        header_cells = _row_cells(header_row)
+        body_rows = [row for row in rows if row is not header_row]
 
     lines = [_pipe_row(header_cells), _pipe_row(["---"] * len(header_cells))]
     lines.extend(_pipe_row(_row_cells(row)) for row in body_rows)

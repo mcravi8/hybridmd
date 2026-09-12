@@ -39,19 +39,34 @@ def test_header_taken_from_thead() -> None:
     assert table_to_markdown(html) == "| H1 | H2 |\n| --- | --- |\n| a | b |"
 
 
-def test_header_taken_from_first_row_without_thead() -> None:
-    html = "<table><tr><td>c1</td><td>c2</td></tr><tr><td>a</td><td>b</td></tr></table>"
+def test_header_taken_from_all_th_first_row_without_thead() -> None:
+    html = "<table><tr><th>c1</th><th>c2</th></tr><tr><td>a</td><td>b</td></tr></table>"
     assert table_to_markdown(html) == "| c1 | c2 |\n| --- | --- |\n| a | b |"
+
+
+def test_all_td_first_row_is_data_and_is_not_promoted_to_header() -> None:
+    # The headerless case. Promoting row 0 would relabel data as column headings
+    # — e.g. a regression row "CONCAVE | -4.57 | ..." becoming the header. An
+    # empty header asserts nothing and keeps every row as a row.
+    html = "<table><tr><td>c1</td><td>c2</td></tr><tr><td>a</td><td>b</td></tr></table>"
+    assert table_to_markdown(html) == ("|  |  |\n| --- | --- |\n| c1 | c2 |\n| a | b |")
 
 
 def test_internal_whitespace_is_collapsed() -> None:
     html = "<table><tr><td>  a\n  b   c  </td><td>d</td></tr></table>"
-    assert table_to_markdown(html) == "| a b c | d |\n| --- | --- |"
+    assert table_to_markdown(html) == "|  |  |\n| --- | --- |\n| a b c | d |"
 
 
 def test_empty_cells_are_allowed() -> None:
     html = "<table><tr><td></td><td>b</td></tr></table>"
-    assert table_to_markdown(html) == "|  | b |\n| --- | --- |"
+    assert table_to_markdown(html) == "|  |  |\n| --- | --- |\n|  | b |"
+
+
+def test_empty_header_width_matches_the_widest_row() -> None:
+    html = "<table><tr><td>a</td></tr><tr><td>b</td><td>c</td></tr></table>"
+    lines = table_to_markdown(html).split("\n")
+    assert lines[0] == "|  |  |"
+    assert lines[1] == "| --- | --- |"
 
 
 def test_delimiter_row_matches_header_width() -> None:
