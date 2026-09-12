@@ -26,11 +26,19 @@ dependencies = ["beautifulsoup4"]
 [project.optional-dependencies]
 # Adapters (document parsers) and backends (renderers / HTML sanitizers) ship as
 # optional extras and will be declared here as the library grows, e.g.:
-#   docx     = ["python-docx"]
 #   sanitize = ["nh3"]
-# The unstructured adapter reads its input purely by duck typing, so this extra is
-# needed only to PRODUCE elements — never to import/run the adapter or core CI.
+# The unstructured adapter reads its input purely by duck typing, so these extras
+# are needed only to PRODUCE elements — never to import/run the adapter or core CI.
+#
+# Bare `unstructured` parses only the formats its core supports (HTML, text, and
+# the element dicts from the Unstructured API). Every binary format needs that
+# format's own upstream extra, so each is mirrored here: installing
+# `hybridmd[unstructured]` alone and then pointing the CLI at a PDF raises
+# ImportError from the backend, which is a confusing way to learn this.
 unstructured = ["unstructured"]
+unstructured-pdf = ["unstructured[pdf]"]
+unstructured-pptx = ["unstructured[pptx]"]
+unstructured-docx = ["unstructured[docx]"]
 # Dev tooling for scripts/token_report.py only — deliberately NOT in `dev`, so
 # core CI stays lean and never installs it.
 bench = ["tiktoken"]

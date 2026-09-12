@@ -92,9 +92,35 @@ hybridmd report.pdf --annotate
 Optional extras:
 
 ```bash
-pip install "hybridmd[unstructured]"   # the Unstructured backend adapter
-pip install "hybridmd[bench]"          # tiktoken, for scripts/token_report.py
+pip install "hybridmd[unstructured]"        # the Unstructured backend adapter
+pip install "hybridmd[unstructured-pdf]"    # ...and PDF support
+pip install "hybridmd[unstructured-pptx]"   # ...and PowerPoint support
+pip install "hybridmd[unstructured-docx]"   # ...and Word support
+pip install "hybridmd[bench]"               # tiktoken, for scripts/token_report.py
 ```
+
+Bare `unstructured` parses only HTML, plain text, and the element dicts the
+Unstructured API returns. **Every binary format needs that format's own extra** —
+the PDF example above needs `hybridmd[unstructured-pdf]`, not just
+`hybridmd[unstructured]`.
+
+## Development
+
+```bash
+python3.12 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"
+ruff check . && ruff format --check . && mypy src && pytest
+```
+
+Requires **Python 3.10+** and **pip 21.3+** — older pip cannot install this
+project in editable mode (hatchling needs PEP 660 support) and fails with a
+misleading `"setup.py" or "setup.cfg" not found`. If you see that, upgrade pip
+rather than the project layout. The macOS system Python is typically too old for
+both; install a newer interpreter instead of fighting it.
+
+Parsing real documents also wants `libmagic` present (`brew install libmagic`,
+`apt install libmagic1`) — without it the backend still runs but falls back to
+weaker filetype detection and says so on stderr.
 
 ## Architecture
 
