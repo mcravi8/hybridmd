@@ -31,6 +31,14 @@ def test_pipe_characters_are_escaped() -> None:
     assert table_to_markdown(html) == ("| a\\|b | c |\n| --- | --- |\n| d | e\\|f |")
 
 
+def test_literal_backslash_pipe_and_html_are_escaped() -> None:
+    html = (
+        r"<table><tr><th>Value</th></tr>"
+        r"<tr><td>a\|b &amp; &lt;br&gt;</td></tr></table>"
+    )
+    assert table_to_markdown(html).splitlines()[-1] == (r"| a\\\|b &amp; &lt;br&gt; |")
+
+
 def test_header_taken_from_thead() -> None:
     html = (
         "<table><thead><tr><th>H1</th><th>H2</th></tr></thead>"
@@ -129,6 +137,23 @@ def test_nested_formatting_tags_are_unwrapped_text_preserved() -> None:
     assert "<b>" not in out
     assert "<i>" not in out
     assert "bold and italic" in out
+
+
+def test_cell_lists_and_paragraphs_keep_boundaries() -> None:
+    html = (
+        "<table><tr><td><p>Items</p><ul><li>one</li><li>two</li></ul></td></tr></table>"
+    )
+    assert sanitize_table_html(html) == html
+
+
+def test_cell_line_break_is_preserved_and_attributes_are_stripped() -> None:
+    html = (
+        '<table><tr><td><div class="x">'
+        'first<br onclick="evil()"/>second</div></td></tr></table>'
+    )
+    assert sanitize_table_html(html) == (
+        "<table><tr><td><div>first<br/>second</div></td></tr></table>"
+    )
 
 
 def test_span_values_preserved_verbatim_not_reparsed() -> None:

@@ -18,8 +18,9 @@ from enum import Enum
 
 from bs4 import BeautifulSoup, Tag
 
-# Block-level tags whose presence in a cell defeats an inline Markdown cell.
-_BLOCK_TAGS = ["p", "ul", "ol", "div"]
+# Cell structure that a plain Markdown pipe cell cannot preserve. In particular,
+# even one <br> would be lost by the text-only Markdown serializer.
+_BLOCK_TAGS = ["p", "ul", "ol", "li", "div", "br"]
 
 # Longest leading run of ASCII digits, per the HTML5 "rules for parsing
 # non-negative integers". Deliberately ``[0-9]`` rather than ``\d`` so that
@@ -165,8 +166,8 @@ def analyze_table(html: str) -> TableAnalysis:
       resolving to > 1 (see :func:`_parse_span` for the defensive policy).
     * ``NESTED_TABLE`` — a ``<table>`` nested inside a cell of the target.
     * ``MULTI_ROW_HEADER`` — a ``<thead>`` containing more than one ``<tr>``.
-    * ``BLOCK_CONTENT`` — any cell containing ``p``, ``ul``, ``ol``, ``div`` or
-      more than one ``<br>``.
+    * ``BLOCK_CONTENT`` — any cell containing ``p``, ``ul``, ``ol``, ``li``,
+      ``div`` or ``br``.
     * ``RAGGED_ROWS`` — *only when no merged cells are present* — rows (``thead``
       and ``tbody`` counted together) with differing cell counts.
 
@@ -216,9 +217,7 @@ def analyze_table(html: str) -> TableAnalysis:
             break
 
     for cell in cells:
-        blocks = _owned(_find_tags(cell, _BLOCK_TAGS), target)
-        line_breaks = _owned(_find_tags(cell, ["br"]), target)
-        if blocks or len(line_breaks) > 1:
+        if _owned(_find_tags(cell, _BLOCK_TAGS), target):
             detected.add(Reason.BLOCK_CONTENT)
             break
 

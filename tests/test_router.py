@@ -146,7 +146,7 @@ def test_marker_lists_multiple_reasons_in_declaration_order() -> None:
     assert render([MULTI_REASON_TABLE], annotate=True) == (
         "<!-- hybridmd: table format=html "
         "reasons=merged_cells,block_content,no_header -->\n"
-        '<table><tr><td colspan="2">Region</td></tr>'
+        '<table><tr><td colspan="2"><p>Region</p></td></tr>'
         "<tr><td>US</td><td>10</td></tr></table>\n"
     )
 
@@ -159,6 +159,23 @@ def test_rowless_table_under_force_md_falls_back_without_raising() -> None:
         "<!-- hybridmd: table format=text reasons=no_html -->\nfallback text\n"
     )
     assert render([EMPTY_TABLE], force="md") == "fallback text\n"
+
+
+def test_cell_list_and_single_line_break_route_to_faithful_html() -> None:
+    table = DocElement(
+        ElementType.TABLE,
+        "one two",
+        html=(
+            "<table><tr><td><ul><li>one</li><li>two</li></ul></td></tr>"
+            "<tr><td>first<br>second</td></tr></table>"
+        ),
+    )
+    assert render([table], annotate=True) == (
+        "<!-- hybridmd: table format=html reasons=block_content,no_header,"
+        "single_column -->\n"
+        "<table><tr><td><ul><li>one</li><li>two</li></ul></td></tr>"
+        "<tr><td>first<br/>second</td></tr></table>\n"
+    )
 
 
 def test_empty_sequence_is_empty_string() -> None:
