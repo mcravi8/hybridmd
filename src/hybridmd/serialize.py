@@ -15,14 +15,32 @@ Only ``beautifulsoup4`` is used; parsing always uses the built-in
 from __future__ import annotations
 
 import re
+from html import escape as escape_html
 
 from bs4 import BeautifulSoup, Comment, Tag
 from bs4.element import NavigableString
 
 from hybridmd.schema import DocElement, ElementType
 
-# Tags kept in sanitized table HTML; everything else is unwrapped.
-_ALLOWED_TAGS = frozenset({"table", "thead", "tbody", "tr", "th", "td", "caption"})
+# Keep table structure and the cell blocks that made Markdown lossy. Attributes
+# on the cell blocks are still stripped, so the fallback remains safe to embed.
+_ALLOWED_TAGS = frozenset(
+    {
+        "table",
+        "thead",
+        "tbody",
+        "tr",
+        "th",
+        "td",
+        "caption",
+        "p",
+        "ul",
+        "ol",
+        "li",
+        "div",
+        "br",
+    }
+)
 # Attributes kept on those tags; everything else is dropped.
 _ALLOWED_ATTRS = frozenset({"colspan", "rowspan"})
 # Elements removed wholesale, including their text content.
@@ -42,9 +60,9 @@ def _first_table(html: str) -> Tag:
 
 
 def _cell_text(cell: Tag) -> str:
-    """Cell text with whitespace collapsed to single spaces and ``|`` escaped."""
+    """Cell text escaped so Markdown cannot reinterpret it as markup or columns."""
     collapsed = " ".join(cell.get_text().split())
-    return collapsed.replace("|", "\\|")
+    return escape_html(collapsed, quote=False).replace("\\", "\\\\").replace("|", "\\|")
 
 
 def _row_cells(row: Tag) -> list[str]:
@@ -85,9 +103,9 @@ def table_to_markdown(html: str) -> str:
     :attr:`~hybridmd.analyzer.Reason.NO_HEADER` records why it is empty.
 
     Cell text has surrounding whitespace stripped and internal whitespace
-    collapsed to single spaces; ``|`` is escaped as ``\\|``; empty cells are
-    permitted. A delimiter row matching the header's column count is emitted
-    between the header and the body.
+    collapsed to single spaces. HTML-sensitive characters, backslashes and
+    pipes are escaped; empty cells are permitted. A delimiter row matching
+    the header's column count is emitted between the header and the body.
 
     Args:
         html: HTML containing the simple table to render.
@@ -130,9 +148,9 @@ def sanitize_table_html(html: str) -> str:
     """Reduce a table's HTML to a tight, deterministic whitelist for embedding.
 
     Used for tables that cannot be represented in Markdown, where embedded HTML
-    is unavoidable. The result keeps only the structural table tags
-    (``table``, ``thead``, ``tbody``, ``tr``, ``th``, ``td``, ``caption``) and
-    the ``colspan``/``rowspan`` attributes:
+    is unavoidable. The result keeps structural table tags, cell paragraphs,
+    lists, divisions and line breaks. Only the ``colspan``/``rowspan``
+    attributes survive:
 
     * ``<script>`` and ``<style>`` elements are dropped entirely, contents and
       all.

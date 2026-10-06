@@ -85,9 +85,10 @@ def test_block_content_multiple_br() -> None:
     )
 
 
-def test_single_br_is_not_block_content() -> None:
+def test_single_br_is_block_content() -> None:
     analysis = analyze_table("<table><tr><td>a<br>b</td></tr></table>")
-    assert Reason.BLOCK_CONTENT not in analysis.reasons
+    assert Reason.BLOCK_CONTENT in analysis.reasons
+    assert analysis.needs_html is True
 
 
 def test_clean_table_needs_no_html() -> None:
